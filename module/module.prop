@@ -1,0 +1,6 @@
+id=q2touch_on_q3
+name=Quest 2 Touch on Quest 3
+version=v2.0
+versionCode=4
+author=LiterallyAxo
+description=Lets Quest 2 Touch controllers pair and track on a Quest 3. Requires Magisk OverlayFS.

@@ -1,0 +1,5 @@
+*.zip
+module/patcher/ledpatch
+*.o
+*.elf
+*.sha256

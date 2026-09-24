@@ -1,0 +1,19 @@
+name: Setup toolchain
+description: Install the Android NDK and ShellCheck
+
+runs:
+  using: composite
+  steps:
+    - uses: nttld/setup-ndk@v1
+      id: ndk
+      with:
+        ndk-version: r27c
+        add-to-path: false
+
+    - name: Export NDK path
+      shell: bash
+      run: echo "ANDROID_NDK_HOME=${{ steps.ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
+
+    - name: Install ShellCheck
+      shell: bash
+      run: pipx install shellcheck-py==0.11.0.1

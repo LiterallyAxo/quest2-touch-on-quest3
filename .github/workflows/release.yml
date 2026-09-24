@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version component to increment
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      dry_run:
+        description: Build without committing, tagging, or publishing
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Compute version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          latest=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          latest=${latest:-v0.0.0}
+          IFS=. read -r major minor patch <<< "${latest#v}"
+          major=${major:-0} minor=${minor:-0} patch=${patch:-0}
+          case "$BUMP" in
+            major) major=$((major + 1)) minor=0 patch=0 ;;
+            minor) minor=$((minor + 1)) patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          version="v$major.$minor.$patch"
+          code=$((major * 1000000 + minor * 1000 + patch))
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "::error::Tag $version already exists"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "$latest -> $version (versionCode $code)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update module.prop
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CODE: ${{ steps.version.outputs.code }}
+        run: |
+          sed -i "s/^version=.*/version=$VERSION/; s/^versionCode=.*/versionCode=$CODE/" module/module.prop
+          grep -qx "version=$VERSION" module/module.prop
+          grep -qx "versionCode=$CODE" module/module.prop
+
+      - uses: ./.github/actions/setup
+
+      - name: Lint
+        run: |
+          shellcheck -s busybox module/*.sh
+          shellcheck build.sh
+
+      - name: Build
+        run: |
+          ./build.sh
+          sha256sum q2touch_on_q3.zip > q2touch_on_q3.zip.sha256
+          cat q2touch_on_q3.zip.sha256 >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and tag
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add module/module.prop
+          git commit -m "Release $VERSION"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push --atomic origin main "$VERSION"
+
+      - name: Publish release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cat > notes.md <<'EOF'
+          Flashable Magisk module for Quest 2 Touch controllers on Quest 3 (`eureka`).
+
+          Requires Magisk and Magisk OverlayFS. Unpair the controllers or remove their batteries before rebooting. See the README for details.
+          EOF
+          gh release create "$VERSION" q2touch_on_q3.zip q2touch_on_q3.zip.sha256 \
+            --title "$VERSION" --notes-file notes.md --generate-notes --verify-tag
