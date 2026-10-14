@@ -49,22 +49,22 @@ With fixes 1 to 3 applied, the controller connects but reports no motion samples
 
 ## Systemless Design
 
-- **OverlayFS.** The patched library lives in an ext4 image on `/data`, mounted over `/odm/lib64` by Magisk OverlayFS. The `/odm` partition is untouched.
+- **Single-file bind mount.** At boot the library is patched into tmpfs (`/dev/.q2touch`), given the original's SELinux label, and bind-mounted over `/odm/lib64/libtrackingengines.so`. The `/odm` partition is untouched.
 - **Memory-only properties.** Set with `resetprop -n`, which bypasses `/data/property/persistent_properties`. They do not survive a boot without the module.
 - **No partition writes.** No block device writes, remounts, fastboot flashing, or `vbmeta` changes. Verified boot is unaffected.
 
-## Install-Time Patcher
+## Boot-Time Patcher
 
-A prebuilt library would only match one firmware build. Instead, `patcher/ledpatch` patches the device's own copy during install. It locates the guard as follows:
+A prebuilt library would only match one firmware build. Instead, `patcher/ledpatch` patches the device's own copy on every boot. The installer runs it once as a dry run to confirm the firmware is supported. It locates the guard as follows:
 
 1. The string `Cannot set LED ontime` must appear exactly once.
 2. The first instruction that loads its address (`adrp` + `add` or `adrp` + `ldr`) is found. The nearest call target at or before it is the fatal formatter `F`.
 3. `F` must have exactly one call site, `C`.
 4. Exactly one `b.mi` may follow `fcmp d1, d0` within three instructions and branch to a target `T` where `branch < T <= C <= T + 0x200`.
 
-Zero or multiple matches at any step aborts the install.
+Zero or multiple matches at any step aborts the install, or skips the mount at boot.
 
-The installer then verifies the output independently: identical file size and exactly four changed bytes. On the development firmware, the result is byte-identical to the manually verified patch. The input file is never modified.
+The output is then verified independently: identical file size and exactly four changed bytes. On the development firmware, the result is byte-identical to the manually verified patch. The input file is never modified.
 
 ## Boot Sequencing
 
@@ -74,7 +74,7 @@ Root is applied after `init` has started `trackingservice` and the sensors HAL. 
 
 ## Safety
 
-- **OTA guard.** The firmware build ID is recorded at install. If it changes, the module disables itself at boot.
+- **Firmware updates.** The live library is re-patched each boot. If the patcher or verification fails, nothing is mounted and the pairing gate stays closed.
 - **Crash-loop guard.** Two consecutive boots that do not finish arming disable the module.
 - **Failure mode.** `trackingservice` is not a critical service. A bad patch breaks controllers, not boot.
 - **Reversible.** Removing the module restores the stock state.
@@ -94,8 +94,8 @@ adb shell cat /data/adb/modules/q2touch_on_q3/run.log
 
 | Path | Purpose |
 |------|---------|
-| `module/customize.sh` | Install: patches the device's library and builds the overlay image |
-| `module/post-fs-data.sh` | Early boot: OTA and crash-loop guards, sets properties |
+| `module/customize.sh` | Install: device check and dry-run patch |
+| `module/post-fs-data.sh` | Early boot: crash-loop guard, patches and bind-mounts the library, sets properties |
 | `module/service.sh` | Late boot: restarts stale services, opens the pairing gate |
 | `module/patcher/ledpatch.c` | Offset-free ELF patcher |
 | `build.sh` | Builds the patcher and packages the zip |
