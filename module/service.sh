@@ -38,7 +38,7 @@ ensure_fresh() {
     s=$(freshness "$proc")
     [ "$s" = fresh ] && { log_line "$label: running post-arm (ok)"; return 0; }
     if [ "$s" = stale ] && [ $restarted -eq 0 ]; then
-      state "$label started before overlay/props; restarting it once"
+      state "$label started before patch/props; restarting it once"
       setprop ctl.restart "$svc"
       restarted=1
       i=0
@@ -55,5 +55,5 @@ ensure_fresh vendor.oculus.hardware.sensors@1.0-service vendor.oculus.sensors-ha
 ensure_fresh trackingservice trackingservice "trackingservice" || finish
 
 resetprop -n persist.ovr.tracking.freepair 1 || magisk resetprop -n persist.ovr.tracking.freepair 1
-state "armed: pairing gate open; sensors HAL + trackingservice confirmed running post-overlay"
+state "armed: pairing gate open; sensors HAL + trackingservice confirmed running post-arm"
 finish

@@ -96,7 +96,7 @@ jobs:
           cat > notes.md <<'EOF'
           Flashable Magisk module for Quest 2 Touch controllers on Quest 3 (`eureka`).
 
-          Requires Magisk and Magisk OverlayFS. Unpair the controllers or remove their batteries before rebooting. See the README for details.
+          Requires Magisk. Unpair the controllers or remove their batteries before rebooting. See the README for details.
           EOF
           gh release create "$VERSION" q2touch_on_q3.zip q2touch_on_q3.zip.sha256 \
             --title "$VERSION" --notes-file notes.md --generate-notes --verify-tag

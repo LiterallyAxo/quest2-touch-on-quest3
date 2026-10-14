@@ -18,12 +18,11 @@ The full technical breakdown is in [WRITEUP.md](WRITEUP.md).
 
 - Your system files are never modified. Uninstalling the module returns the headset to stock.
 - The installer checks your firmware first and refuses to install if it is not supported.
-- The module turns itself off after a system update. Reinstall it to re-enable.
+- After a system update the library is re-patched on boot. If the new firmware is not recognised, nothing is mounted and the headset boots stock.
 
 ## Requirements
 
 - Quest 3 rooted with Magisk
-- Magisk OverlayFS (built into Singularity)
 
 Quest 3S and other headsets are not tested, and therefore not supported officially.
 If you have the capability to test this on a 3S or similar, you can fork this and attempt to get it working.
